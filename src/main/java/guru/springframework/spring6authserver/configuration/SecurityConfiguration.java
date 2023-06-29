@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.core.AuthorizationGrantType;
@@ -50,18 +52,16 @@ public class SecurityConfiguration {
             throws Exception {
         OAuth2AuthorizationServerConfiguration.applyDefaultSecurity(http);
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
-                .oidc(Customizer.withDefaults());    // Enable OpenID Connect 1.0
+                .oidc(Customizer.withDefaults());	// Enable OpenID Connect 1.0
         http
                 // Redirect to the login page when not authenticated from the
                 // authorization endpoint
                 .exceptionHandling((exceptions) -> exceptions
                         .authenticationEntryPoint(
-                                new LoginUrlAuthenticationEntryPoint("/login")
-                        )
+                                new LoginUrlAuthenticationEntryPoint("/login"))
                 )
                 // Accept access tokens for User Info and/or Client Registration
-                .oauth2ResourceServer((resourceServer) -> resourceServer
-                        .jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(OAuth2ResourceServerConfigurer::jwt);
 
         return http.build();
     }
@@ -89,7 +89,7 @@ public class SecurityConfiguration {
      */
     @Bean
     public UserDetailsService userDetailsService() {
-        UserDetails userDetails = withDefaultPasswordEncoder()
+        UserDetails userDetails = User.withDefaultPasswordEncoder()
                 .username("user")
                 .password("password")
                 .roles("USER")
@@ -103,15 +103,15 @@ public class SecurityConfiguration {
      */
     @Bean
     public RegisteredClientRepository registeredClientRepository() {
-        RegisteredClient oidcClient = RegisteredClient
-                .withId(UUID.randomUUID().toString())
-                .clientId("oidc-client")
+        RegisteredClient registeredClient = RegisteredClient.withId(UUID.randomUUID().toString())
+                .clientId("messaging-client")
                 .clientSecret("{noop}secret")
                 .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
                 .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
                 .authorizationGrantType(AuthorizationGrantType.REFRESH_TOKEN)
-                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/oidc-client")
-                .postLogoutRedirectUri("http://127.0.0.1:8080/authorized")
+                .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+                .redirectUri("http://127.0.0.1:8080/login/oauth2/code/messaging-client-oidc")
+                .redirectUri("http://127.0.0.1:8080/authorized")
                 .scope(OidcScopes.OPENID)
                 .scope(OidcScopes.PROFILE)
                 .scope("message.read")
@@ -119,7 +119,7 @@ public class SecurityConfiguration {
                 .clientSettings(ClientSettings.builder().requireAuthorizationConsent(true).build())
                 .build();
 
-        return new InMemoryRegisteredClientRepository(oidcClient);
+        return new InMemoryRegisteredClientRepository(registeredClient);
     }
 
     /*
